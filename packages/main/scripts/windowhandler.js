@@ -34,7 +34,7 @@ class WindowHandler {
       this.bipwindow = null
       this.config = null
       this.multicastClient = null
-      this.nodehun = null  //needed for manual spellchecker
+      
     }
 
     init (mc, config) {

@@ -21,10 +21,8 @@
  * This is used to preload packages for the renderer process of electron (the frontend)
  */
 
-import { contextBridge, ipcRenderer, webFrame } from 'electron'
-import virtualized from './scripts/simplevmdetect.js';  // has to run in frontend (since we create a webgl insance) > inform backend (mulitcastClient.clientinfo)
+import { contextBridge, ipcRenderer } from 'electron'
 
-if (virtualized){ipcRenderer.send('virtualized')}
 let config = ipcRenderer.sendSync('getconfig')  // we need to fetch the updated version of the systemconfig from express api (server.js)
 
 /** document ready */

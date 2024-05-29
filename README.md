@@ -14,11 +14,11 @@ just the original geogebra packaged as linux appimage
 
 ```npm i```
 
-## run next-exam 
+## run geogebra
 
 ```npm run dev```
 
-## build next-exam 
+## build geogebra
 
 ```npm run build```
 ```npm run build:win```
