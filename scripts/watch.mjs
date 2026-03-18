@@ -11,10 +11,11 @@ function watchMain(server) {
    */
   let electronProcess = null
   const address = server.httpServer.address()
-  const env = Object.assign(process.env, {
+  const { NODE_OPTIONS, ...envBase } = process.env
+  const env = Object.assign(envBase, {
     VITE_DEV_SERVER_HOST: address.address,
     VITE_DEV_SERVER_PORT: address.port,
-    //NODE_TLS_REJECT_UNAUTHORIZED : 0
+    // NODE_OPTIONS stripped - Electron blocks flags like --disable-warning=
   })
 
 
