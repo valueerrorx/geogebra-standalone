@@ -18,12 +18,9 @@
 
 import path from 'path'
 import fs from 'fs'
-import ip from 'ip'
-import axios from 'axios'
 import i18n from '../../renderer/src/locales/locales.js'
 const {t} = i18n.global
 import{ipcMain} from 'electron'
-import os from 'os'
 import log from 'electron-log/main';
 
   ////////////////////////////////
@@ -40,6 +37,29 @@ class IpcHandler {
         this.multicastClient = mc
         this.config = config
         this.WindowHandler = wh  
+
+
+
+
+        /**
+         * Switch to kiosk
+         */ 
+        ipcMain.handle('kioskmode', (event, state=true) => {   
+           
+            if (state) {
+                this.WindowHandler.mainwindow.setKiosk(true);
+                this.WindowHandler.mainwindow.addListener('blur', () => this.WindowHandler.blurevent()) 
+                this.WindowHandler.mainwindow.kiosk = true
+            }
+            else {
+                this.WindowHandler.mainwindow.setKiosk(false);
+                this.WindowHandler.mainwindow.removeAllListeners('blur')
+                this.WindowHandler.mainwindow.kiosk = false
+            }
+        })
+
+
+
 
 
         /**

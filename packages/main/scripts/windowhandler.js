@@ -15,9 +15,10 @@
  * If not, see <http://www.gnu.org/licenses/>
  */
 
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow} from 'electron'
 import { join } from 'path'
-
+import log from 'electron-log/main';
+import { exec } from 'child_process';
 
   ////////////////////////////////////////////////////////////
  // Window handling (ipcRenderer Process - Frontend) START
@@ -25,20 +26,11 @@ import { join } from 'path'
 
 class WindowHandler {
     constructor () {
-      this.blockwindows = []
-      this.screenlockwindows = []
-      this.screenlockWindow = null
       this.mainwindow = null
-      this.examwindow = null
-      this.splashwin = null
-      this.bipwindow = null
       this.config = null
-      this.multicastClient = null
-      
     }
 
-    init (mc, config) {
-        this.multicastClient = mc
+    init ( config) {
         this.config = config
     }
 
@@ -62,6 +54,8 @@ class WindowHandler {
             }
         })
 
+        this.mainwindow.kiosk = false
+
         if (app.isPackaged || process.env["DEBUG"]) {
             this.mainwindow.removeMenu() 
             this.mainwindow.loadFile(join(__dirname, '../renderer/index.html'))
@@ -79,7 +73,52 @@ class WindowHandler {
             this.mainwindow.focus();
             this.mainwindow.moveTop();
         })
+
+        this.mainwindow.on('close', async  (e) => {
+            if (  this.mainwindow.kiosk == true) {
+                 e.preventDefault();
+            }
+        });
+
+
+
+
     }
+
+
+
+    async blurevent() { 
+
+        log.info("windowhandler @ blurevent: student tried to leave exam window")
+
+        this.mainwindow.moveTop();
+        this.mainwindow.setKiosk(true);
+        this.mainwindow.show();  
+        this.mainwindow.focus();    // we keep focus on the window.. no matter what
+
+        //turn volume up ^^
+        try{
+            if (process.platform === 'win32') { spawn('powershell', ['Set-VolumeLevel -Level 100; Set-VolumeMute -Mute $false']); }
+            if (process.platform ==='darwin') { exec('osascript -e "set volume output volume 100" -e "set volume output muted false"'); }  
+            if (process.platform === 'linux') { 
+               // exec('amixer set Master 100% ');
+                exec('pactl set-sink-mute `pactl get-default-sink` 0');
+                exec('pactl set-sink-volume "$(pactl get-default-sink)" 100%');
+
+            }
+       }
+        catch(e){
+            log.warn(`windowhandler @ blurevent: couldn't turn volume up`)
+        }
+
+        // send info to frontend
+        this.mainwindow.webContents.send('attention');
+
+    }
+
+
+
+
 }
 
 export default new WindowHandler()

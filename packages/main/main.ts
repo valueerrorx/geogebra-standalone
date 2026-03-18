@@ -48,9 +48,15 @@ if (!fs.existsSync(config.tempdirectory)){ fs.mkdirSync(config.tempdirectory); }
 
 
 app.commandLine.appendSwitch('lang', 'de')
+//app.commandLine.appendSwitch('no-sandbox'); // Fügt den no-sandbox Flag hinzu
+//app.commandLine.appendSwitch('disable-dev-shm-usage');
+
+//app.commandLine.appendSwitch('disable-gpu-sandbox');
+
+
 fsExtra.emptyDirSync(config.tempdirectory)  // clean temp directory
 
-WindowHandler.init(false, config)  // mainwindow, examwindow, blockwindow
+WindowHandler.init(config)  // mainwindow, examwindow, blockwindow
 IpcHandler.init(false, config, WindowHandler)  //controll all Inter Process Communication
 
 log.initialize(); // initialize the logger for any renderer process
@@ -106,7 +112,27 @@ app.whenReady()
         })
     }
     WindowHandler.createMainWindow()
+
+
+
+    globalShortcut.register('CommandOrControl+R', () => {});
+    globalShortcut.register('F5', () => {});  //reload page
+    globalShortcut.register('CommandOrControl+Shift+R', () => {});
+    globalShortcut.register('Alt+F4', () => {});  //exit app
+
+    globalShortcut.register('CommandOrControl+W', () => {});
+    globalShortcut.register('CommandOrControl+Q', () => {});  //quit
+    globalShortcut.register('CommandOrControl+D', () => {});  //show desktop
+    globalShortcut.register('CommandOrControl+L', () => {});  //lockscreen
+    globalShortcut.register('CommandOrControl+P', () => {});  //change screen layout
+    globalShortcut.register('Alt+Left', () => {
+        console.log('Versuch, mit Alt+Left zurückzunavigieren, wurde blockiert.');
+    });
+
 })
+
+
+
 
   ////////////////////////////////
  // APP handling (Backend) END

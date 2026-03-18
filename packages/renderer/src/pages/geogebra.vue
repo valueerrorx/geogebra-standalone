@@ -16,8 +16,10 @@
     <!-- filelist start - show local files from workfolder (pdf and gbb only)-->
     <div id="toolbar" class="d-inline p-1 pb-0">  
         <button title="backup" @click="saveContent(true); " class="btn  d-inline btn-success p-1 ms-2 mb-1 btn-sm"><img src="/src/assets/img/svg/document-save.svg" class="white" width="20" height="20" ></button>
-        <button title="delete" @click="clearAll(); " class="btn  d-inline btn-danger p-1 ms-2 mb-1 btn-sm"><img src="/src/assets/img/svg/edit-delete.svg" class="white" width="20" height="20" ></button>
+        <button title="delete" @click="clearAll(); " class="btn  d-inline btn-secondary p-1 ms-2 mb-1 btn-sm"><img src="/src/assets/img/svg/edit-delete.svg" class="white" width="20" height="20" ></button>
         <button title="paste" @click="showClipboard(); " class="btn  d-inline btn-secondary p-1 ms-2 mb-1 btn-sm"><img src="/src/assets/img/svg/edit-paste-style.svg" class="white" width="20" height="20" ></button>
+
+        
         <div class="btn-group  ms-2 " role="group">
             <div class="btn btn-outline-info btn-sm  mb-1" @click="setsource('suite')"> <img src="/src/assets/img/svg/formula.svg" class="" width="20" height="20" >suite</div>
             <div class="btn btn-outline-info btn-sm  mb-1" @click="setsource('classic')"> <img src="/src/assets/img/svg/formula.svg" class="" width="20" height="20" >classic</div>
@@ -27,6 +29,10 @@
             <div v-if="(file.type == 'pdf')" class="btn btn-secondary ms-2 mb-1 btn-sm" @click="selectedFile=file.name; loadPDF(file.name)"><img src="/src/assets/img/svg/document-replace.svg" class="" width="20" height="20" > {{file.name}} </div>
             <div v-if="(file.type == 'ggb')" class="btn btn-info ms-2 mb-1  btn-sm" @click="selectedFile=file.name; loadGGB(file.name)"><img src="/src/assets/img/svg/document-replace.svg" class="" width="20" height="20" > {{file.name}} </div>
         </div>
+
+
+        <button style="float: right;" title="Prüfungsmodus" @click="activateKiosk(); " class="btn  d-inline btn-danger p-1 ms-2 mb-1 btn-sm"><img src="/src/assets/img/svg/shield-lock.svg" class="white" width="20" height="20" ></button>
+
     </div>
     <!-- filelist end -->
     
@@ -81,7 +87,8 @@ export default {
             localfiles: null,
             battery: null,
             customClipboard: [],
-            isClipboardVisible: false
+            isClipboardVisible: false,
+            kiosk: false,
         }
     }, 
     components: {  },  
@@ -92,30 +99,84 @@ export default {
         this.currentFile = this.clientname
         this.entrytime = new Date().getTime()  
          
-        if (this.electron){
-            this.saveEvent = ipcRenderer.on('save', () => {  //trigger document save by signal "save" sent from data.js
-                console.log("EVENT RECEIVED")
-                this.saveContent() 
-            }); 
+       
+        this.saveEvent = ipcRenderer.on('save', () => {  //trigger document save by signal "save" sent from data.js
+            console.log("EVENT RECEIVED")
+            this.saveContent() 
+        }); 
 
-            ipcRenderer.on('fileerror', (event, msg) => {
-                console.log('geogebra @ fileerror: writing/deleting file error received');
-                this.$swal.fire({
-                        title: "Error",
-                        text: msg.message,
-                        icon: "error",
-                        //timer: 30000,
-                        showCancelButton: false,
-                        didOpen: () => { this.$swal.showLoading(); },
-                })
-            });
-        }
+        ipcRenderer.on('fileerror', (event, msg) => {
+            console.log('geogebra @ fileerror: writing/deleting file error received');
+            this.$swal.fire({
+                    title: "Error",
+                    text: msg.message,
+                    icon: "error",
+                    //timer: 30000,
+                    showCancelButton: false,
+                    didOpen: () => { this.$swal.showLoading(); },
+            })
+        });
+
+
+        ipcRenderer.on('attention', (event, msg) => {
+            console.log('student tried to leave kiosk mode');
+            const audio = new Audio("attention.wav");
+            audio.play()
+            document.getElementById("toolbar").style.backgroundColor = "red"
+        });
+
+
+
+
+
+        
         this.$nextTick(function () { // Code that will run only after the entire view has been rendered
             this.loadfilelistinterval = setInterval(() => { this.loadFilelist() }, 10000)   // zeigt html dateien (angaben, eigene arbeit) im header
             this.loadFilelist()
         })
     },
     methods: { 
+
+
+        // kiosk mode mit ipc invoke aktuvieren für electron
+        activateKiosk(){
+            if (this.kiosk){
+                this.$swal({
+                    title: "Prüfungsmodus deaktivieren",
+                    text: "Möchten Sie den Prüfungsmodus wirklich verlassen? \nDie Prüfung darf danach nicht mehr fortgesetzt werden",
+                    showCancelButton: true,
+                    confirmButtonText: 'Ok',
+                    cancelButtonText: this.$t("editor.cancel"),
+                 }).then((result) => {
+                    if (result.isConfirmed) { 
+                        this.kiosk = false;
+                        ipcRenderer.invoke('kioskmode', false );
+                        const audio = new Audio("leave.oga");
+                        audio.play()
+                    }
+                    else {return; }
+                });  
+            }
+            else {
+                this.$swal({
+                    title: "Prüfungsmodus aktivieren",
+                    showCancelButton: true,
+                    confirmButtonText: 'Ok',
+                    cancelButtonText: this.$t("editor.cancel"),
+                 }).then((result) => {
+                    if (result.isConfirmed) { 
+                        this.kiosk = true;
+                        ipcRenderer.invoke('kioskmode', true );
+                        document.getElementById("toolbar").style.backgroundColor = "#1a4b1c"
+                    }
+                    else {return; }
+                });  
+
+            }
+        },
+
+
+
         redefineConsole(){
             const ggbIframe = document.getElementById('geogebraframe');
             const iframeWindow = ggbIframe.contentWindow;  // Zugriff auf den Kontext des iframe
