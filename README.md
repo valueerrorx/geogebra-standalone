@@ -18,11 +18,9 @@ just the original geogebra packaged as linux appimage
 
 ```npm run dev```
 
-## build geogebra
+## build geogebra for linux (appimage, deb)
 
 ```npm run build```
-```npm run build:win```
-```npm run build:mac```
 
 
 

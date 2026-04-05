@@ -34,7 +34,6 @@ import IpcHandler from './scripts/ipchandler.js'
 import config from './config.js';
 import path from 'path'
 import fs from 'fs'
-import fsExtra from "fs-extra"
 import os from 'os'
 import log from 'electron-log/main';
 
@@ -54,7 +53,8 @@ app.commandLine.appendSwitch('lang', 'de')
 //app.commandLine.appendSwitch('disable-gpu-sandbox');
 
 
-fsExtra.emptyDirSync(config.tempdirectory)  // clean temp directory
+fs.rmSync(config.tempdirectory, { recursive: true, force: true })
+fs.mkdirSync(config.tempdirectory, { recursive: true })
 
 WindowHandler.init(config)  // mainwindow, examwindow, blockwindow
 IpcHandler.init(false, config, WindowHandler)  //controll all Inter Process Communication
@@ -103,31 +103,29 @@ app.on('activate', () => {
 })
 
 app.whenReady()
+.catch((e) => { log.error('main: whenReady error', e) })
 .then(()=>{
+    log.info('main: app ready, creating window...')
     nativeTheme.themeSource = 'light'
     powerSaveBlocker.start('prevent-display-sleep')
-    if (process.platform === 'win32') {
-        import('node-prevent-sleep').then( preventSleep => {
-            preventSleep.enable();
-        })
-    }
     WindowHandler.createMainWindow()
+    log.info('main: window created')
 
 
 
-    globalShortcut.register('CommandOrControl+R', () => {});
-    globalShortcut.register('F5', () => {});  //reload page
-    globalShortcut.register('CommandOrControl+Shift+R', () => {});
-    globalShortcut.register('Alt+F4', () => {});  //exit app
+    // globalShortcut.register('CommandOrControl+R', () => {});
+    // globalShortcut.register('F5', () => {});  //reload page
+    // globalShortcut.register('CommandOrControl+Shift+R', () => {});
+    // globalShortcut.register('Alt+F4', () => {});  //exit app
 
-    globalShortcut.register('CommandOrControl+W', () => {});
-    globalShortcut.register('CommandOrControl+Q', () => {});  //quit
-    globalShortcut.register('CommandOrControl+D', () => {});  //show desktop
-    globalShortcut.register('CommandOrControl+L', () => {});  //lockscreen
-    globalShortcut.register('CommandOrControl+P', () => {});  //change screen layout
-    globalShortcut.register('Alt+Left', () => {
-        console.log('Versuch, mit Alt+Left zurückzunavigieren, wurde blockiert.');
-    });
+    // globalShortcut.register('CommandOrControl+W', () => {});
+    // globalShortcut.register('CommandOrControl+Q', () => {});  //quit
+    // globalShortcut.register('CommandOrControl+D', () => {});  //show desktop
+    // globalShortcut.register('CommandOrControl+L', () => {});  //lockscreen
+    // globalShortcut.register('CommandOrControl+P', () => {});  //change screen layout
+    // globalShortcut.register('Alt+Left', () => {
+    //     console.log('Versuch, mit Alt+Left zurückzunavigieren, wurde blockiert.');
+    // });
 
 })
 

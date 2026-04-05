@@ -28,7 +28,7 @@
             "public"
         ],
         "directories": {
-            "output": "../release/${version}"
+            "output": "release/${version}"
         },
         "compression": "normal",
         "files": [
@@ -43,59 +43,17 @@
             "category": "Utility",
             "icon": "public/icons/256x256.png",
             "artifactName": "${productName}_${version}.${ext}"
-        },
-        "mac": {
-            "icon": "public/icons/icon.png",
-            "artifactName": "${productName}_${version}_${arch}.${ext}",
-            "hardenedRuntime": true,
-            "gatekeeperAssess": false,
-            "entitlements": "entitlements.mac.plist",
-            "entitlementsInherit": "entitlements.mac.plist",
-            "category": "public.app-category.utilities",
-            "target": {
-                "target": "dmg",
-                "arch": [
-                    "universal"
-                ]
-            }
-        },
-        "dmg": {
-            "sign": "true"
-        },
-        "portable": {
-            "useZip": true,
-            "unpackDirName": true,
-            "splashImage": "public/splash.bmp"
-        },
-        "win": {
-            "icon": "public/icons/icon.ico",
-            "target": [
-                {
-                    "target": "portable",
-                    "arch": [
-                        "x64"
-                    ]
-                }
-            ],
-            "artifactName": "${productName}_${version}.${ext}",
-            "certificateSubjectName": "OSOS Austria",
-            "signingHashAlgorithms": [
-                "sha256"
-            ]
         }
     },
     "engines": {
-        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
+        "node": ">=22.0.0"
     },
     "devDependencies": {
-        "@types/screenshot-desktop": "^1.15.0",
         "@vitejs/plugin-vue": "^6.0.5",
         "electron": "^41.1.1",
         "electron-builder": "^26.8.1",
-        "nodemon": "^3.1.14",
         "typescript": "^6.0.2",
         "vite": "^8.0.3",
-        "vite-plugin-resolve": "^2.5.2",
         "vue": "^3.5.32"
     },
     "env": {
@@ -109,25 +67,11 @@
         "rollup"
     ],
     "dependencies": {
-        "archiver": "^7.0.1",
-        "axios": "^1.14.0",
+        "@popperjs/core": "^2.11.8",
         "bootstrap": "^5.3.8",
-        "cors": "^2.8.6",
         "electron-log": "^5.4.3",
         "esbuild": "^0.28.0",
-        "express": "^5.2.1",
-        "express-fileupload": "^1.5.2",
-        "fs": "^0.0.1-security",
-        "lowlight": "^3.3.0",
-        "moment-timezone": "^0.6.1",
-        "node-addon-api": "^8.7.0",
-        "node-forge": "^1.4.0",
-        "node-gyp": "^12.2.0",
-        "node-notifier": "^10.0.1",
-        "node-prevent-sleep": "^0.0.4",
-        "play-sound": "^1.1.6",
         "sass": "^1.99.0",
-        "validator": "^13.15.35",
         "vue-router": "^5.0.4",
         "vue-sweetalert2": "^5.0.11"
     }

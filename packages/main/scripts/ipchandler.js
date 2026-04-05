@@ -80,7 +80,7 @@ class IpcHandler {
 
                 try {
                     fs.writeFileSync(ggbFilePath, fileData);
-                    return  { sender: "client", message:t("data.filestored") , status:"success" }
+                    return  { sender: "client", message: "Datei gespeichert", status:"success" }
                 }
                 catch(err){
                     this.WindowHandler.examwindow.webContents.send('fileerror', err)  

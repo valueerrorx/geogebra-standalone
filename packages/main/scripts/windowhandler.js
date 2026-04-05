@@ -70,11 +70,13 @@ class WindowHandler {
         const viteDevSession = Boolean(process.env.VITE_DEV_SERVER_HOST && process.env.VITE_DEV_SERVER_PORT)
         if (viteDevSession || this.config.showdevtools) { this.mainwindow.webContents.openDevTools() }
 
-        this.mainwindow.once('ready-to-show', () => {
-            this.mainwindow.setAlwaysOnTop(true)
+        this.mainwindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, url) => {
+            log.error(`windowhandler @ did-fail-load: ${errorCode} ${errorDescription} ${url}`)
+        })
+
+        this.mainwindow.webContents.once('did-finish-load', () => {
             this.mainwindow.show()
             this.mainwindow.focus();
-            this.mainwindow.moveTop();
         })
 
         this.mainwindow.on('close', async  (e) => {
