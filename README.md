@@ -1,6 +1,6 @@
 # geogebra - linux - standalone
 
-just the original geogebra packaged as linux appimage
+just the original geogebra packaged as linux appimage and debian package
 
 
 # technologies used
