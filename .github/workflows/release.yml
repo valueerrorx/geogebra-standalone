@@ -1,9 +1,20 @@
-name: Build & Release
+# Builds AppImage + deb and publishes a GitHub Release when package.json "version" changes on main.
+
+name: Package on version bump
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'package.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -12,82 +23,101 @@ jobs:
   check-version:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
-      should_release: ${{ steps.check.outputs.should_release }}
+      build: ${{ steps.diff.outputs.build }}
+      version: ${{ steps.diff.outputs.version }}
     steps:
       - uses: actions/checkout@v4.2.2
         with:
-          fetch-depth: 2
-
-      - name: Get current version
-        id: get_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Check if version changed
-        id: check
+          fetch-depth: 0
+      - id: diff
         run: |
-          PREV=$(git show HEAD~1:package.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).version" 2>/dev/null || echo "none")
-          CURR="${{ steps.get_version.outputs.version }}"
-          echo "Previous version: $PREV"
-          echo "Current version: $CURR"
+          set -euo pipefail
+          CURR=$(node -p "require('./package.json').version")
+          echo "version=$CURR" >> "$GITHUB_OUTPUT"
+          BEFORE="${{ github.event.before }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "No parent SHA; treating as first push — building."
+            exit 0
+          fi
+          if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "Parent commit not in history; building."
+            exit 0
+          fi
+          PREV=$(git show "$BEFORE:package.json" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)
+          if [ -z "$PREV" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "Could not read previous version; building."
+            exit 0
+          fi
           if [ "$PREV" != "$CURR" ]; then
-            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "Version changed: $PREV -> $CURR"
           else
-            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "package.json changed but version is still $CURR — skipping build."
           fi
 
-  build:
+  linux:
     needs: check-version
-    if: needs.check-version.outputs.should_release == 'true'
+    if: needs.check-version.outputs.build == 'true'
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4.4.0
+      - name: Changelog
+        run: |
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            NOTES=$(git log --no-merges -n 40 --pretty=format:'- %s (%h)' HEAD)
+          else
+            NOTES=$(git log --no-merges --pretty=format:'- %s (%h)' "$BEFORE..HEAD" || true)
+          fi
+          [ -z "$NOTES" ] && NOTES="- (no commits in range)"
+          {
+            echo "## Changes"
+            echo ""
+            echo "$NOTES"
+          } > release-notes.md
+
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: '22'
+          cache: npm
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: Install Linux build dependencies
         run: sudo apt-get update && sudo apt-get install -y rpm fakeroot
 
       - name: Build
-        run: node scripts/build.mjs && electron-builder -l --publish never
+        run: node scripts/build.mjs && npx electron-builder -l --publish never
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^v${{ needs.check-version.outputs.version }}$" | head -1)
-          if [ -z "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s (%h)" | head -30)
-          else
-            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)")
-          fi
-          [ -z "$COMMITS" ] && COMMITS="- Initial release"
-          {
-            echo "changelog<<EOF"
-            echo "## What's Changed"
-            echo ""
-            echo "$COMMITS"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2.3.2
-        with:
-          tag_name: v${{ needs.check-version.outputs.version }}
-          name: GeoGebra Standalone v${{ needs.check-version.outputs.version }}
-          body: ${{ steps.changelog.outputs.changelog }}
-          draft: false
-          prerelease: false
-          files: |
-            release/${{ needs.check-version.outputs.version }}/*.AppImage
-            release/${{ needs.check-version.outputs.version }}/*.deb
+      - name: Create GitHub release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ needs.check-version.outputs.version }}"
+          VERSION="${{ needs.check-version.outputs.version }}"
+          ASSET_FILES=(release/${VERSION}/*.AppImage release/${VERSION}/*.deb)
+          if [ "${#ASSET_FILES[@]}" -eq 0 ]; then
+            echo "No release assets found in release/${VERSION}/"
+            exit 1
+          fi
+          echo "Creating release ${TAG} with ${#ASSET_FILES[@]} assets"
+          gh release create "$TAG" "${ASSET_FILES[@]}" \
+            --title "GeoGebra Standalone ${VERSION}" \
+            --notes-file release-notes.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-dist
+          path: release/${{ needs.check-version.outputs.version }}/*
