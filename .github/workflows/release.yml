@@ -58,7 +58,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rpm fakeroot
 
       - name: Build
-        run: npm run build
+        run: node scripts/build.mjs && electron-builder -l --publish never
 
       - name: Generate changelog
         id: changelog
