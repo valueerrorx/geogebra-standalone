@@ -59,30 +59,24 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate changelog
         id: changelog
         run: |
-          VERSION="${{ needs.check-version.outputs.version }}"
-          PREV_TAG=$(git tag --sort=-version:refname | head -1)
-
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^v${{ needs.check-version.outputs.version }}$" | head -1)
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --pretty=format:"- %s (%h)" | head -30)
           else
             COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)")
           fi
-
-          if [ -z "$COMMITS" ]; then
-            COMMITS="- Initial release"
-          fi
-
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "## What's Changed" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          [ -z "$COMMITS" ] && COMMITS="- Initial release"
+          {
+            echo "changelog<<EOF"
+            echo "## What's Changed"
+            echo ""
+            echo "$COMMITS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2.3.2
