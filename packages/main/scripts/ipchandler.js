@@ -18,8 +18,6 @@
 
 import path from 'path'
 import fs from 'fs'
-import i18n from '../../renderer/src/locales/locales.js'
-const {t} = i18n.global
 import{ipcMain} from 'electron'
 import log from 'electron-log/main';
 
@@ -112,24 +110,6 @@ class IpcHandler {
             }     
         })
 
-
-        /**
-         * GET PDF from Work directory
-         * @param filename if set the content of the file is returned
-         */ 
-        ipcMain.handle('getpdfasync', (event, filename) => {   
-            const workdir = path.join(config.workdirectory,"/")
-            if (filename) { //return content of specific file
-                let filepath = path.join(workdir,filename)
-                try {
-                    let data = fs.readFileSync(filepath)
-                    return data
-                } 
-                catch (error) {
-                    return { sender: "client", content: false , status:"error" }
-                }    
-            }
-        })
 
 
         /**

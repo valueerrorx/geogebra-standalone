@@ -2,8 +2,6 @@
 import { defineConfig, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import pkg from '../../package.json'
-import  {vueI18n} from '@intlify/vite-plugin-vue-i18n'
-import path from 'path'
 
 // https://vitejs.dev/config/
 
@@ -23,13 +21,6 @@ export default defineConfig({
         }
       }
     }),
-    vueI18n({
-        compositionOnly: false,
-        include: path.resolve(__dirname, './src/locales/*'),
-        runtimeOnly: false,
-        fullInstall: true,
-        forceStringify : true,
-      })
   ],
   base: './',
  
@@ -40,7 +31,20 @@ export default defineConfig({
     minify: true,
     chunkSizeWarningLimit:5000,
   },
-  css: {   // this covers bootstrap css warnings when minifying the css code
+  css: {
+    // Silence Bootstrap/Vite Sass deprecations until upstream migrates (no node_modules patches).
+    preprocessorOptions: {
+      scss: {
+        quietDeps: true,
+        silenceDeprecations: [
+          'color-functions',
+          'import',
+          'global-builtin',
+          'if-function',
+          'legacy-js-api',
+        ],
+      },
+    },
     postcss: {
       plugins: [
         {

@@ -1,6 +1,6 @@
 {
     "name": "geogebra-standalone",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "main": "dist/main/main.cjs",
     "author": {
         "name": "Thomas Michael Weissel",
@@ -13,6 +13,7 @@
     "type": "module",
     "scripts": {
         "dev": "node scripts/watch.mjs",
+        "start": "node scripts/start.mjs",
         "build": "node scripts/build.mjs && electron-builder -l",
         "build:mac": "node scripts/build.mjs && electron-builder -m",
         "build:win": "node scripts/build.mjs && electron-builder -w"
@@ -23,7 +24,6 @@
         "asar": {
             "smartUnpack": true
         },
-        "afterSign": "scripts/notarize.cjs",
         "asarUnpack": [
             "public"
         ],
@@ -39,8 +39,7 @@
             "target": [
                 "AppImage",
                 "deb"
-              ],
-    
+            ],
             "category": "Utility",
             "icon": "public/icons/256x256.png",
             "artifactName": "${productName}_${version}.${ext}"
@@ -89,17 +88,15 @@
         "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
     },
     "devDependencies": {
-        "@intlify/vite-plugin-vue-i18n": "^3.3.1",
-        "@types/screenshot-desktop": "^1.12.0",
-        "@vitejs/plugin-vue": "^2.3.4",
-        "electron": "^24.1.2",
-        "electron-builder": "^24.2.1",
-        "electron-notarize": "^1.2.2",
-        "nodemon": "^2.0.15",
-        "typescript": "^4.5.5",
-        "vite": "^2.7.13",
-        "vite-plugin-resolve": "^1.6.1",
-        "vue": "^3.2.31"
+        "@types/screenshot-desktop": "^1.15.0",
+        "@vitejs/plugin-vue": "^6.0.5",
+        "electron": "^41.1.1",
+        "electron-builder": "^26.8.1",
+        "nodemon": "^3.1.14",
+        "typescript": "^6.0.2",
+        "vite": "^8.0.3",
+        "vite-plugin-resolve": "^2.5.2",
+        "vue": "^3.5.32"
     },
     "env": {
         "//": "Used in build scripts",
@@ -112,29 +109,26 @@
         "rollup"
     ],
     "dependencies": {
-        "archiver": "^5.3.0",
-        "axios": "^0.26.0",
-        "bootstrap": "^5.3.2",
-        "cors": "^2.8.5",
-        "electron-log": "^5.0.1",
-        "esbuild": "^0.19.11",
-        "express": "^4.17.3",
-        "express-fileupload": "^1.3.1",
+        "archiver": "^7.0.1",
+        "axios": "^1.14.0",
+        "bootstrap": "^5.3.8",
+        "cors": "^2.8.6",
+        "electron-log": "^5.4.3",
+        "esbuild": "^0.28.0",
+        "express": "^5.2.1",
+        "express-fileupload": "^1.5.2",
         "fs": "^0.0.1-security",
-        "html2pdf-jspdf2": "^0.1.2",
-        "ip": "^1.1.5",
-        "lowlight": "^2.5.0",
-        "moment-timezone": "^0.5.45",
-        "node-addon-api": "^7.0.0",
-        "node-forge": "^1.3.1",
-        "node-gyp": "^10.0.1",
+        "lowlight": "^3.3.0",
+        "moment-timezone": "^0.6.1",
+        "node-addon-api": "^8.7.0",
+        "node-forge": "^1.4.0",
+        "node-gyp": "^12.2.0",
         "node-notifier": "^10.0.1",
         "node-prevent-sleep": "^0.0.4",
-        "play-sound": "^1.1.5",
-        "sass": "^1.49.9",
-        "validator": "^13.7.0",
-        "vue-i18n": "^9.1.9",
-        "vue-router": "^4.0.13",
-        "vue-sweetalert2": "^5.0.2"
+        "play-sound": "^1.1.6",
+        "sass": "^1.99.0",
+        "validator": "^13.15.35",
+        "vue-router": "^5.0.4",
+        "vue-sweetalert2": "^5.0.11"
     }
 }

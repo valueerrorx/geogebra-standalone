@@ -35,17 +35,8 @@ if (userAgent.indexOf(' electron/') > -1) {
 }
 
 const routes = [
-    { path: '/',                    name:"math",        component: geogebra,      beforeEnter: [addParams]            },
+    { path: '/', name:"math", component: geogebra },
 ]
-
-function addParams(to){
-    to.params.version = config.version
-    to.params.serverApiPort = config.serverApiPort 
-    to.params.clientApiPort = config.clientApiPort
-    to.params.electron = electron
-    to.params.config = config
-}
-
 
 
 export function createRouter() {

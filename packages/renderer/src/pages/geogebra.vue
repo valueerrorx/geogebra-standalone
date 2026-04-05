@@ -4,9 +4,8 @@
         https://stage.geogebra.org/license#NonCommercialLicenseAgreement
         https://www.gnu.org/licenses/gpl-3.0.html
 
-    This page allows you to use geogebra classic and geogebra suite in the context of next-exam 
-    Some features of geogebra are hidden because of the restrictive nature of the digital exam environment
-    Tracking features have been removed to comply with dsgvo regulations
+    This page allows you to use geogebra classic and geogebra suite on linux desktop.
+    Some features of geogebra are hidden because of the restrictive nature of the software.
   -->
  
  
@@ -26,7 +25,6 @@
         </div>
         
         <div v-for="file in localfiles" class="d-inline">
-            <div v-if="(file.type == 'pdf')" class="btn btn-secondary ms-2 mb-1 btn-sm" @click="selectedFile=file.name; loadPDF(file.name)"><img src="/src/assets/img/svg/document-replace.svg" class="" width="20" height="20" > {{file.name}} </div>
             <div v-if="(file.type == 'ggb')" class="btn btn-info ms-2 mb-1  btn-sm" @click="selectedFile=file.name; loadGGB(file.name)"><img src="/src/assets/img/svg/document-replace.svg" class="" width="20" height="20" > {{file.name}} </div>
         </div>
 
@@ -41,15 +39,48 @@
    
 
     <div id="content">
-        <iframe id="geogebraframe" src="./geogebra/classic.html"></iframe>
+        <webview id="geogebraframe" src="./geogebra/classic.html" style="visibility:hidden"></webview>
     </div>
 
 
-    <div v-if="isClipboardVisible" class="customClipboard">
-      <button class="btn btn-sm btn-outline-success m-1" style="display: block; width:132px" v-for="(item, index) in customClipboard" :key="index" @click="insertFromClipboar(item)">
-        <img src="/src/assets/img/svg/edit-paste-style.svg" class="white" width="16" height="16" >{{ item }}
-      </button>
-    </div>
+    <Transition name="clipboard-slide">
+      <aside
+        v-if="isClipboardVisible"
+        class="customClipboard"
+        aria-label="Clipboard"
+      >
+        <div class="customClipboard__header">
+          <span class="customClipboard__title">Schnell einfügen</span>
+          <button
+            type="button"
+            class="customClipboard__close"
+            aria-label="Schließen"
+            @click="showClipboard()"
+          >
+            ×
+          </button>
+        </div>
+        <div class="customClipboard__list">
+          <button
+            v-for="(item, index) in customClipboard"
+            :key="index"
+            type="button"
+            class="customClipboard__item"
+            @click="insertFromClipboar(item)"
+          >
+            <img
+              src="/src/assets/img/svg/edit-paste-style.svg"
+              alt=""
+              width="16"
+              height="16"
+              class="customClipboard__item-icon"
+            />
+            <span class="customClipboard__item-text">{{ item }}</span>
+          </button>
+          <p v-if="!customClipboard.length" class="customClipboard__empty">Noch keine Einträge</p>
+        </div>
+      </aside>
+    </Transition>
 
 
 </template>
@@ -61,40 +92,57 @@ export default {
     data() {
         return {
             componentName: 'GeoGebra',
-            online: true,
-            focus: true,
-            exammode: false,
             currentFile:null,
-            fetchinterval: null,
-            fetchinfointerval: null,
             loadfilelistinterval: null,
-            clockinterval: null,
-            servername: this.$route.params.servername,
-            servertoken: this.$route.params.servertoken,
-            serverip: this.$route.params.serverip,
-            token: this.$route.params.token,
-            clientname: this.$route.params.clientname,
-            serverApiPort: this.$route.params.serverApiPort,
-            clientApiPort: this.$route.params.clientApiPort,
-            
-            electron: this.$route.params.electron,
-            pincode : this.$route.params.pincode,
-            clientinfo: null,
             entrytime: 0,
-            timesinceentry: 0,
-            currenttime : 0,
-            now : new Date().getTime(),
             localfiles: null,
-            battery: null,
             customClipboard: [],
             isClipboardVisible: false,
             kiosk: false,
+
+            // ─── CSS-Injection ───────────────────────────────────────────
+            // Hier CSS eintragen das in classic.html / suite.html injiziert werden soll.
+            // Wird nach jedem Laden (auch bei setsource) automatisch eingefügt,
+            // bevor der webview sichtbar wird.
+            customCSS: `
+                #buttonsID { display: none !important; }
+                /* Bild-Tool (mode 26) und Hilfe-Button in der Werkzeug-Seitenleiste */
+                button[id="mode26"],
+                button[aria-label="Hilfe"],
+                button[aria-label="Help"] { display: none !important; }
+                /* Hilfe-Button im Perspektiven-Popup-Header */
+                button.helpBtn { display: none !important; }
+                /* Hilfe & Feedback, Anmelden, Datei - ganze li Elemente */
+                li[aria-label="Hilfe & Feedback"],
+                li[aria-label="Help & Feedback"],
+                li[aria-label="Anmelden"],
+                li[aria-label="Sign In"],
+                li[aria-label="Datei"],
+                li[aria-label="File"] { display: none !important; }
+            `,
+            // Menüeinträge die im GeoGebra-Hamburger-Menü ausgeblendet werden sollen (exakter Text)
+            hideMenuTexts: [
+                'Neu', 'New',
+                'Prüfungsmodus', 'Exam Calculator',
+                'Hilfe & Feedback', 'Help & Feedback',
+                'Anmelden', 'Sign In',
+                'Bild exportieren', 'Export Image',
+                'Online speichern', 'Save Online',
+                'Öffnen', 'Open',
+                'Auf dem Computer speichern', 'Save to Device',
+                'Teilen', 'Share',
+                'Druckvorschau', 'Print Preview',
+                'Austeilen', 'Assign',
+                'Herunterladen als', 'Herunterladen als…', 'Download as', 'Download as…',
+                'Download',
+                'Bild', 'Image',
+                'Hilfe', 'Help',
+            ],
+            // ─────────────────────────────────────────────────────────────
         }
-    }, 
+    },
     components: {  },  
     mounted() {
-
-        this.redefineConsole()  // overwrite console log to grep specific outputs and store as clipboard entry
 
         this.currentFile = this.clientname
         this.entrytime = new Date().getTime()  
@@ -130,13 +178,33 @@ export default {
 
 
         
-        this.$nextTick(function () { // Code that will run only after the entire view has been rendered
-            this.loadfilelistinterval = setInterval(() => { this.loadFilelist() }, 10000)   // zeigt html dateien (angaben, eigene arbeit) im header
+        this.$nextTick(() => {
+            this.loadfilelistinterval = setInterval(() => { this.loadFilelist() }, 10000)
             this.loadFilelist()
+
+            // CSS-Injection: nach jedem Laden des webview CSS einschleusen, dann sichtbar machen
+            const wv = this.ggbWebview()
+            if (wv) {
+                this._cssInjectBound = () => this.injectCSS()
+                wv.addEventListener('did-finish-load', this._cssInjectBound)
+                // console-message events only work after dom-ready
+                this._domReadyBound = () => {
+                    this.redefineConsole()
+                    if (import.meta.env.DEV) {
+                        const g = this.ggbWebview()
+                        if (g) g.openDevTools()
+                    }
+                }
+                wv.addEventListener('dom-ready', this._domReadyBound)
+            }
         })
     },
     methods: { 
 
+        ggbWebview() {
+            const el = document.getElementById('geogebraframe')
+            return el && el.tagName === 'WEBVIEW' ? el : null
+        },
 
         // kiosk mode mit ipc invoke aktuvieren für electron
         activateKiosk(){
@@ -146,13 +214,14 @@ export default {
                     text: "Möchten Sie den Prüfungsmodus wirklich verlassen? \nDie Prüfung darf danach nicht mehr fortgesetzt werden",
                     showCancelButton: true,
                     confirmButtonText: 'Ok',
-                    cancelButtonText: this.$t("editor.cancel"),
+                    cancelButtonText: 'Abbrechen',
                  }).then((result) => {
-                    if (result.isConfirmed) { 
+                    if (result.isConfirmed) {
                         this.kiosk = false;
                         ipcRenderer.invoke('kioskmode', false );
                         const audio = new Audio("leave.oga");
                         audio.play()
+                        this.injectCSS()
                     }
                     else {return; }
                 });  
@@ -162,12 +231,13 @@ export default {
                     title: "Prüfungsmodus aktivieren",
                     showCancelButton: true,
                     confirmButtonText: 'Ok',
-                    cancelButtonText: this.$t("editor.cancel"),
+                    cancelButtonText: 'Abbrechen',
                  }).then((result) => {
-                    if (result.isConfirmed) { 
+                    if (result.isConfirmed) {
                         this.kiosk = true;
                         ipcRenderer.invoke('kioskmode', true );
                         document.getElementById("toolbar").style.backgroundColor = "#1a4b1c"
+                        this.injectCSS()
                     }
                     else {return; }
                 });  
@@ -177,90 +247,120 @@ export default {
 
 
 
-        redefineConsole(){
-            const ggbIframe = document.getElementById('geogebraframe');
-            const iframeWindow = ggbIframe.contentWindow;  // Zugriff auf den Kontext des iframe
-            const originalIframeConsoleLog = iframeWindow.console.log;  // Speichern der originalen console.log Funktion des iframe
-
-            iframeWindow.console.log = (message) => {
-                // Prüfen, ob die Nachricht ein GeoGebra-spezifisches Muster enthält
-                if (typeof message === "string" && message.includes("existing")) {
-                    const partAfterExistingGeo = message.split("existing geo:")[1].trim();
-                    const extractedText = partAfterExistingGeo.split("=")[1].trim();
-                    this.customClipboard.push( extractedText )
-                    if (this.customClipboard.length > 10) {    this.customClipboard.shift();     }   //customclipboard länge begrenzen
-                } 
-                else {
-                    // geogebra spammed jede aktion in die console daher unterdrücken wir das erstmal
-                    //originalIframeConsoleLog.apply(iframeWindow.console, arguments);      // Aufrufen der ursprünglichen Funktion für alle anderen Nachrichten
+        redefineConsole() {
+            const wv = this.ggbWebview()
+            if (!wv) return
+            if (this._ggbConsoleBound) wv.removeEventListener('console-message', this._ggbConsoleBound)
+            this._ggbConsoleBound = (e) => {
+                const message = e.message
+                if (typeof message === 'string' && message.includes('existing geo:')) {
+                    const partAfterExistingGeo = message.split('existing geo:')[1].trim()
+                    const extractedText = partAfterExistingGeo.split('=')[1].trim()
+                    if (!this.customClipboard.includes(extractedText)) {
+                        this.customClipboard.push(extractedText)
+                        if (this.customClipboard.length > 10) this.customClipboard.shift()
+                    }
                 }
-            };
+            }
+            wv.addEventListener('console-message', this._ggbConsoleBound)
         },
  
-
-
-        // fetch file from disc - show preview
-        async loadPDF(file){
-            let data = await ipcRenderer.invoke('getpdfasync', file )
-            let url =  URL.createObjectURL(new Blob([data], {type: "application/pdf"})) 
-
-            document.querySelector("#pdfembed").setAttribute("src", `${url}#toolbar=0&navpanes=0&scrollbar=0`);
-            document.querySelector("#preview").style.display = 'block';
-
-        },
-
 
         async loadFilelist(){
             let filelist = await ipcRenderer.invoke('getfilesasync', null)
             this.localfiles = filelist;
         },
-        setsource(source){
-            let iFrame = document.getElementById('geogebraframe')
-            if (source === "suite")   { iFrame.src = `./geogebra/suite.html`  }
-            if (source === "classic") { iFrame.src = `./geogebra/classic.html`}
-            iFrame.parentNode.replaceChild(iFrame.cloneNode(), iFrame);
+        async injectCSS() {
+            const wv = this.ggbWebview()
+            if (!wv) return
+            const escaped = this.kiosk ? this.customCSS.replace(/`/g, '\\`').replace(/\\/g, '\\\\').replace(/\$/g, '\\$') : ''
+            const hideTexts = this.kiosk ? JSON.stringify(this.hideMenuTexts) : '[]'
+            await wv.executeJavaScript(`
+                (function() {
+                    // 1) Custom CSS (nur im Prüfungsmodus)
+                    var existing = document.getElementById('__ggb_custom_css__')
+                    if (existing) existing.remove()
+                    var s = document.createElement('style')
+                    s.id = '__ggb_custom_css__'
+                    s.textContent = \`${escaped}\`
+                    document.head.appendChild(s)
+
+                    // 2) Menüeinträge per Text ausblenden (nur im Prüfungsmodus)
+                    var hideTexts = ${hideTexts}
+                    function hideMenuItems(menu) {
+                        menu.querySelectorAll('li.gwt-MenuItem').forEach(function(li) {
+                            var txt = li.textContent.trim()
+                            if (hideTexts.indexOf(txt) !== -1) {
+                                li.style.setProperty('display', 'none', 'important')
+                            }
+                        })
+                    }
+                    if (window.__ggbMenuObserver__) {
+                        window.__ggbMenuObserver__.disconnect()
+                        window.__ggbMenuObserver__ = null
+                    }
+                    if (hideTexts.length > 0) {
+                        window.__ggbMenuObserver__ = new MutationObserver(function(mutations) {
+                            mutations.forEach(function(m) {
+                                m.addedNodes.forEach(function(node) {
+                                    if (node.nodeType !== 1) return
+                                    var menus = node.classList && node.classList.contains('gwt-MenuBar-vertical')
+                                        ? [node]
+                                        : Array.from(node.querySelectorAll('.gwt-MenuBar-vertical'))
+                                    menus.forEach(hideMenuItems)
+                                })
+                            })
+                        })
+                        window.__ggbMenuObserver__.observe(document.body, { childList: true, subtree: true })
+                        document.querySelectorAll('.gwt-MenuBar-vertical').forEach(hideMenuItems)
+                    }
+                })()
+            `)
+            wv.style.visibility = 'visible'
+        },
+
+        setsource(source) {
+            const wv = this.ggbWebview()
+            if (!wv) return
+            wv.style.visibility = 'hidden'
+            if (source === 'suite') wv.src = './geogebra/suite.html'
+            if (source === 'classic') wv.src = './geogebra/classic.html'
             this.redefineConsole()
-        },  
+        },
         showClipboard() {
             this.isClipboardVisible = this.isClipboardVisible ? false: true;
         },
-        insertFromClipboar(value){
-            const ggbIframe = document.getElementById('geogebraframe');
-            const ggbApplet = ggbIframe.contentWindow.ggbApplet;   // get the geogebra applet and all of its methods
-            
-            ggbApplet.evalCommand(value);
+        async insertFromClipboar(value) {
+            const wv = this.ggbWebview()
+            if (!wv) return
+            await wv.executeJavaScript(`window.ggbApplet && window.ggbApplet.evalCommand(${JSON.stringify(value)})`)
         },
 
-        clearAll(){
-            const ggbIframe = document.getElementById('geogebraframe');
-            const ggbApplet = ggbIframe.contentWindow.ggbApplet;   // get the geogebra applet and all of its methods
+        clearAll() {
             this.$swal({
-                title: "",
-                text: this.$t("math.clear") ,
+                title: '',
+                text: 'Alle Berechnungen löschen?',
                 showCancelButton: true,
                 inputAttributes: {
                     maxlength: 20,
                 },
                 confirmButtonText: 'Ok',
-                cancelButtonText: this.$t("editor.cancel")
-         
-             })
-            .then((result) => {
-                if (result.isConfirmed) { 
-                    ggbApplet.reset()
-                }
-                else {return; }
-            });
+                cancelButtonText: 'Abbrechen',
+            }).then(async (result) => {
+                if (!result.isConfirmed) return
+                const wv = this.ggbWebview()
+                if (wv) await wv.executeJavaScript('window.ggbApplet && window.ggbApplet.reset()')
+            })
         },
 
          /** Saves Content as GGB */
-        async saveContent(manual) {  
-            const ggbIframe = document.getElementById('geogebraframe');
-            const ggbApplet = ggbIframe.contentWindow.ggbApplet;   // get the geogebra applet and all of its methods
+        async saveContent(manual) {
+            const wv = this.ggbWebview()
+            if (!wv) return
             let filename = `${this.clientname}.ggb`
-            if (manual){ 
-                await this.$swal({
-                    title: this.$t("math.filename") ,
+            if (manual) {
+                const dlg = await this.$swal({
+                    title: 'Dateiname',
                     input: 'text',
                     inputPlaceholder: 'Type here...',
                     showCancelButton: true,
@@ -268,30 +368,34 @@ export default {
                         maxlength: 20,
                     },
                     confirmButtonText: 'Ok',
-                    cancelButtonText: this.$t("editor.cancel"),
+                    cancelButtonText: 'Abbrechen',
                     inputValidator: (value) => {
-                        const regex = /^[A-Za-z0-9]+$/;
-                        if (!value.match(regex)) {
-                            return  this.$t("math.nospecial") ;
-                        }                   
-                     },
-                 }).then((result) => {
-                    if (result.isConfirmed) { filename = `${result.value}-bak.ggb`}
-                    else {return; }
-                });
+                        const regex = /^[A-Za-z0-9]+$/
+                        if (!value.match(regex)) return 'Bitte geben Sie nur Buchstaben oder Zahlen ein.'
+                    },
+                })
+                if (!dlg.isConfirmed) return
+                filename = `${dlg.value}-bak.ggb`
             }
-            
-            ggbApplet.getBase64( async (base64GgbFile) => {
-                let response = await ipcRenderer.invoke('saveGGB', {filename: filename, content: base64GgbFile})   // send base64 string to backend for saving
-                if (response.status === "success" && manual){  // we wait for a response - only show feed back if manually saved
-                    this.loadFilelist()
-                    this.$swal.fire({
-                        title: this.$t("editor.saved"),
-                        text: filename,
-                        icon: "info"
-                    })
-                }
-            })
+            let base64GgbFile
+            try {
+                base64GgbFile = await wv.executeJavaScript(`new Promise((resolve, reject) => {
+                    if (!window.ggbApplet) reject(new Error('no ggbApplet'))
+                    else window.ggbApplet.getBase64(resolve)
+                })`)
+            } catch (e) {
+                console.error('geogebra @ saveContent:', e)
+                return
+            }
+            const response = await ipcRenderer.invoke('saveGGB', { filename, content: base64GgbFile })
+            if (response.status === 'success' && manual) {
+                this.loadFilelist()
+                this.$swal.fire({
+                    title: 'Gespeichert',
+                    text: filename,
+                    icon: 'info',
+                })
+            }
         },
 
 
@@ -299,22 +403,23 @@ export default {
         // get file from local workdirectory and replace editor content with it
         async loadGGB(file){
             this.$swal.fire({
-                title: this.$t("editor.replace"),
-                html:  `${this.$t("editor.replacecontent1")} <b>${file}</b> ${this.$t("editor.replacecontent2")}`,
+                title: "Ersetzen",
+                html:  `${"Wollen Sie den Inhalt der Datei"} <b>${file}</b> ${"ersetzen?"}`,
                 icon: "question",
                 showCancelButton: true,
-                cancelButtonText: this.$t("editor.cancel"),
+                cancelButtonText: "Abbrechen",
                 reverseButtons: true
             })
             .then(async (result) => {
                 if (result.isConfirmed) {
 
                     const result = await ipcRenderer.invoke('loadGGB', file);
-                    if (result.status === "success") {
-                        const base64GgbFile = result.content;
-                        const ggbIframe = document.getElementById('geogebraframe');
-                        const ggbApplet = ggbIframe.contentWindow.ggbApplet;
-                        ggbApplet.setBase64(base64GgbFile);
+                    if (result.status === 'success') {
+                        const base64GgbFile = result.content
+                        const wv = this.ggbWebview()
+                        if (wv) {
+                            await wv.executeJavaScript(`window.ggbApplet && window.ggbApplet.setBase64(${JSON.stringify(base64GgbFile)})`)
+                        }
                     } else {
                         console.error('Error loading file');
                     }
@@ -324,7 +429,13 @@ export default {
        
     },
     beforeUnmount() {
-        clearInterval( this.loadfilelistinterval )
+        clearInterval(this.loadfilelistinterval)
+        const wv = document.getElementById('geogebraframe')
+        if (wv) {
+            if (this._ggbConsoleBound) wv.removeEventListener('console-message', this._ggbConsoleBound)
+            if (this._cssInjectBound) wv.removeEventListener('did-finish-load', this._cssInjectBound)
+            if (this._domReadyBound) wv.removeEventListener('dom-ready', this._domReadyBound)
+        }
     },
 }
 
@@ -332,27 +443,151 @@ export default {
 
 <style scoped>
 
-.customClipboard {
-    z-index: 1000000;
-    width: 160px;
-    height: 380px;
-    position: absolute;
-    top: 100px;
-    left: 50%;
-    margin-left: -100px;
-    background-color: rgb(33,37,41);
-    border-radius: 5px;
-    padding: 10px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.8);
-
+.clipboard-slide-enter-active,
+.clipboard-slide-leave-active {
+    transition:
+        transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.32s ease,
+        box-shadow 0.38s ease;
 }
 
+.clipboard-slide-enter-from,
+.clipboard-slide-leave-to {
+    transform: translateX(100%);
+    opacity: 0;
+    box-shadow: -4px 0 24px rgba(15, 23, 42, 0);
+}
+
+.customClipboard {
+    position: fixed;
+    top: 56px;
+    right: 0;
+    bottom: 0;
+    z-index: 1000000;
+    width: min(280px, 86vw);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-left: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: -8px 0 32px rgba(15, 23, 42, 0.12);
+    border-radius: 12px 0 0 0;
+}
+
+.customClipboard__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    flex-shrink: 0;
+}
+
+.customClipboard__title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(15, 23, 42, 0.75);
+    text-transform: uppercase;
+}
+
+.customClipboard__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.06);
+    color: rgba(15, 23, 42, 0.55);
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.customClipboard__close:hover {
+    background: rgba(15, 23, 42, 0.1);
+    color: rgba(15, 23, 42, 0.85);
+}
+
+.customClipboard__list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.customClipboard__empty {
+    margin: 24px 8px 0;
+    font-size: 0.875rem;
+    color: rgba(15, 23, 42, 0.45);
+    text-align: center;
+}
+
+.customClipboard__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.65);
+    color: rgba(15, 23, 42, 0.88);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.customClipboard__item:hover {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(13, 110, 253, 0.25);
+    box-shadow: 0 2px 12px rgba(13, 110, 253, 0.08);
+}
+
+.customClipboard__item-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    opacity: 0.65;
+}
+
+.customClipboard__item-text {
+    word-break: break-word;
+    min-width: 0;
+}
+
+#content {
+    width: 100%;
+    height: calc(100vh - 56px);
+}
+
+#geogebraframe {
+    display: inline-flex;
+    width: 100%;
+    height: 100%;
+}
 
 #suiteAppPicker {
     visibility: visible !important;
 }
 
 @media print{
+    .customClipboard {
+        display: none !important;
+    }
     #apphead {
         display: none !important;
     }
@@ -375,40 +610,9 @@ export default {
     }
 }
 
-
-
-
-
 #localfiles {
     position: relative;
    
 
 }
-#preview {
-    display: none;
-    position: absolute;
-    top:0;
-    left: 0;
-    width:100vw;
-    height: 100vh;
-    background-color: rgba(0, 0, 0, 0.4);
-    z-index:100000;
-}
-
-#pdfembed { 
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    margin-left: -30vw;
-    margin-top: -45vh;
-    width:60vw;
-    height: 90vh;
-    padding: 10px;
-    background-color: rgba(255, 255, 255, 1);
-    border: 0px solid rgba(255, 255, 255, 0.589);
-    box-shadow: 0 0 15px rgba(22, 9, 9, 0.589);
-    padding: 10px;
-    border-radius: 6px;
-}
-
 </style>

@@ -45,26 +45,15 @@ function domReady(condition: DocumentReadyState[] = ['complete', 'interactive'])
 })()
 
 // --------- Expose some API to the Renderer process. ---------
-contextBridge.exposeInMainWorld('ipcRenderer', withPrototype(ipcRenderer))   // this gives us an option to access the electron mainwindow with an ipc call
+contextBridge.exposeInMainWorld('ipcRenderer', {
+  on:      (channel: string, listener: (...args: any[]) => void) => ipcRenderer.on(channel, listener),
+  once:    (channel: string, listener: (...args: any[]) => void) => ipcRenderer.once(channel, listener),
+  off:     (channel: string, listener: (...args: any[]) => void) => ipcRenderer.off(channel, listener),
+  send:    (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
+  invoke:  (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+  sendSync:(channel: string, ...args: any[]) => ipcRenderer.sendSync(channel, ...args),
+})
 contextBridge.exposeInMainWorld('config', config )  // expose configuration (readonly) to the renderer (frontend)
 
  
 
-// `exposeInMainWorld` can't detect attributes and methods of `prototype`, manually patching it.
-function withPrototype(obj: Record<string, any>) {
-  const protos = Object.getPrototypeOf(obj)
-
-  for (const [key, value] of Object.entries(protos)) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) continue
-
-    if (typeof value === 'function') {
-      // Some native APIs, like `NodeJS.EventEmitter['on']`, don't work in the Renderer process. Wrapping them into a function.
-      obj[key] = function (...args: any) {
-        return value.call(obj, ...args)
-      }
-    } else {
-      obj[key] = value
-    }
-  }
-  return obj
-}

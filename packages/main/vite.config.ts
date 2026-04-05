@@ -9,6 +9,7 @@ export default defineConfig({
   },
   root: __dirname,
   build: {
+    ssr: true, // SSR bundle keeps process.env at runtime (default client build stubs it as {} and breaks Electron).
     outDir: '../../dist/main',
     emptyOutDir: true,
     lib: {
@@ -19,6 +20,9 @@ export default defineConfig({
     minify: true,
     sourcemap: true,
     rollupOptions: {
+      output: {
+        entryFileNames: '[name].cjs',
+      },
       external: [
         'electron',
         ...builtinModules,

@@ -19,7 +19,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { createRouter } from './router'
-import i18n from './locales/locales.js'
 import VueSweetalert2 from 'vue-sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -36,7 +35,6 @@ const vApp = createApp(App)
 
 
 vApp.use(router)
-vApp.use(i18n)
 vApp.use(VueSweetalert2, options)
 //vApp.config.unwrapInjectedRef = true  // should not be neccecary in future versions (suppress specific warning)
 

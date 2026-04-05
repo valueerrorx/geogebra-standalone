@@ -43,32 +43,35 @@ class WindowHandler {
             title: 'Main window',
             icon: join(__dirname, '../../public/icons/icon.png'),
             center:true,
-            width: 1000,
-            height: 600,
+            width: 1200,
+            height: 800,
             minWidth: 760,
             minHeight: 600,
             show: false,
             webPreferences: {
                 preload: join(__dirname, '../preload/preload.cjs'),
-                spellcheck: false
+                spellcheck: false,
+                webviewTag: true,
             }
         })
 
         this.mainwindow.kiosk = false
 
-        if (app.isPackaged || process.env["DEBUG"]) {
-            this.mainwindow.removeMenu() 
+        const useBuiltRenderer = app.isPackaged || app.commandLine.hasSwitch('geogebra-dist')
+        if (useBuiltRenderer) {
+            this.mainwindow.removeMenu()
             this.mainwindow.loadFile(join(__dirname, '../renderer/index.html'))
-        } 
-        else {
-            const url = `http://${process.env['VITE_DEV_SERVER_HOST']}:${process.env['VITE_DEV_SERVER_PORT']}`
-            this.mainwindow.removeMenu() 
+        } else {
+            const url = `http://${process.env.VITE_DEV_SERVER_HOST}:${process.env.VITE_DEV_SERVER_PORT}`
+            this.mainwindow.removeMenu()
             this.mainwindow.loadURL(url)
         }
 
-        if (this.config.showdevtools) { this.mainwindow.webContents.openDevTools()  } // you don't want this in the final build
+        const viteDevSession = Boolean(process.env.VITE_DEV_SERVER_HOST && process.env.VITE_DEV_SERVER_PORT)
+        if (viteDevSession || this.config.showdevtools) { this.mainwindow.webContents.openDevTools() }
 
         this.mainwindow.once('ready-to-show', () => {
+            this.mainwindow.setAlwaysOnTop(true)
             this.mainwindow.show()
             this.mainwindow.focus();
             this.mainwindow.moveTop();
@@ -79,16 +82,10 @@ class WindowHandler {
                  e.preventDefault();
             }
         });
-
-
-
-
     }
 
 
-
     async blurevent() { 
-
         log.info("windowhandler @ blurevent: student tried to leave exam window")
 
         this.mainwindow.moveTop();
@@ -98,27 +95,18 @@ class WindowHandler {
 
         //turn volume up ^^
         try{
-            if (process.platform === 'win32') { spawn('powershell', ['Set-VolumeLevel -Level 100; Set-VolumeMute -Mute $false']); }
-            if (process.platform ==='darwin') { exec('osascript -e "set volume output volume 100" -e "set volume output muted false"'); }  
             if (process.platform === 'linux') { 
                // exec('amixer set Master 100% ');
                 exec('pactl set-sink-mute `pactl get-default-sink` 0');
                 exec('pactl set-sink-volume "$(pactl get-default-sink)" 100%');
-
             }
        }
         catch(e){
             log.warn(`windowhandler @ blurevent: couldn't turn volume up`)
         }
-
         // send info to frontend
         this.mainwindow.webContents.send('attention');
-
     }
-
-
-
-
 }
 
 export default new WindowHandler()
