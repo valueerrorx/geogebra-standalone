@@ -1,6 +1,6 @@
 {
     "name": "geogebra-standalone",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "main": "dist/main/main.cjs",
     "author": {
         "name": "Thomas Michael Weissel",
