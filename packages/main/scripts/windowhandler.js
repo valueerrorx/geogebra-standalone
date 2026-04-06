@@ -15,7 +15,7 @@
  * If not, see <http://www.gnu.org/licenses/>
  */
 
-import { app, BrowserWindow} from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import log from 'electron-log/main';
 import { exec } from 'child_process';
@@ -52,6 +52,8 @@ class WindowHandler {
                 preload: join(__dirname, '../preload/preload.cjs'),
                 spellcheck: false,
                 webviewTag: true,
+                webSecurity: false,
+                allowRunningInsecureContent: true,
             }
         })
 
@@ -78,6 +80,7 @@ class WindowHandler {
             this.mainwindow.show()
             this.mainwindow.focus();
         })
+
 
         this.mainwindow.on('close', async  (e) => {
             if (  this.mainwindow.kiosk == true) {

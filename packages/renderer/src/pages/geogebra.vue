@@ -39,7 +39,6 @@
    
 
     <div id="content">
-        <webview id="geogebraframe" src="./geogebra/classic.html" style="visibility:hidden"></webview>
     </div>
 
 
@@ -87,6 +86,7 @@
 
 <script>
 
+/* global GGBApplet */
 
 export default {
     data() {
@@ -143,6 +143,7 @@ export default {
     },
     components: {  },  
     mounted() {
+        this.initGeoGebra();
 
         this.currentFile = this.clientname
         this.entrytime = new Date().getTime()  
@@ -181,30 +182,84 @@ export default {
         this.$nextTick(() => {
             this.loadfilelistinterval = setInterval(() => { this.loadFilelist() }, 10000)
             this.loadFilelist()
-
-            // CSS-Injection: nach jedem Laden des webview CSS einschleusen, dann sichtbar machen
-            const wv = this.ggbWebview()
-            if (wv) {
-                this._cssInjectBound = () => this.injectCSS()
-                wv.addEventListener('did-finish-load', this._cssInjectBound)
-                // console-message events only work after dom-ready
-                this._domReadyBound = () => {
-                    this.redefineConsole()
-                    if (import.meta.env.DEV) {
-                        const g = this.ggbWebview()
-                        if (g) g.openDevTools()
-                    }
-                }
-                wv.addEventListener('dom-ready', this._domReadyBound)
-            }
         })
     },
     methods: { 
 
-        ggbWebview() {
-            const el = document.getElementById('geogebraframe')
-            return el && el.tagName === 'WEBVIEW' ? el : null
+        initGeoGebra(appName = 'suite') {
+            const container = document.getElementById('content')
+            if (!container) return
+            if (window.ggbApplet) { try { window.ggbApplet.remove() } catch (e) {} }
+            container.innerHTML = ''
+
+            const toolbarHeight = document.getElementById('toolbar')?.offsetHeight || 56
+            const params = {
+                "appName": appName,
+                "width": window.innerWidth,
+                "height": window.innerHeight - toolbarHeight,
+                "showToolBar": true,
+                "showAlgebraInput": true,
+                "showMenuBar": true,
+                "enableCAS": true,
+                "isOffline": true,
+                "disableAutoScale": true,
+                "useBrowserForJS": false,
+                "appletOnLoad": () => {
+                    this.injectCSS()
+                    const parseClientEvent = (event) => {
+                        let e = event
+                        if (typeof e === 'string') {
+                            try { e = JSON.parse(e) } catch { return null }
+                        }
+                        if (e && typeof e === 'object' && !Array.isArray(e) && 'type' in e) {
+                            return { type: e.type, target: e.target }
+                        }
+                        if (Array.isArray(e) && e.length >= 2) {
+                            return { type: e[0], target: e[1] }
+                        }
+                        return null
+                    }
+                    this._ggbClipIgnoreSelectUntil = 0
+                    window.ggbApplet.registerClientListener((event) => {
+                        const ev = parseClientEvent(event)
+                        if (!ev || !ev.type) return
+                        if (ev.type === 'editorKeyTyped') {
+                            this._ggbClipIgnoreSelectUntil = Date.now() + 550
+                            return
+                        }
+                        if (ev.type !== 'select' || !ev.target) return
+                        if (Date.now() < this._ggbClipIgnoreSelectUntil) return
+                        const label = String(ev.target)
+                        const pushVal = () => {
+                            try {
+                                const api = window.ggbApplet
+                                const val = this.ggbClipboardValueFromObject(api, label)
+                                if (val && !this.customClipboard.includes(val)) {
+                                    this.customClipboard.push(val)
+                                    if (this.customClipboard.length > 10) this.customClipboard.shift()
+                                }
+                            } catch (e) {}
+                        }
+                        requestAnimationFrame(() => { requestAnimationFrame(pushVal) })
+                    })
+                    if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler)
+                    let resizeTimer = null
+                    this._resizeHandler = () => {
+                        clearTimeout(resizeTimer)
+                        resizeTimer = setTimeout(() => {
+                            const th = document.getElementById('toolbar')?.offsetHeight || 56
+                            window.ggbApplet?.setSize(Math.floor(window.innerWidth), Math.floor(window.innerHeight - th))
+                        }, 150)
+                    }
+                    window.addEventListener('resize', this._resizeHandler)
+                }
+            }
+            const applet = new GGBApplet(params, true)
+            applet.setHTML5Codebase('/geogebra/GeoGebra/HTML5/5.0/web3d/')
+            applet.inject('content')
         },
+
+
 
         // kiosk mode mit ipc invoke aktuvieren für electron
         activateKiosk(){
@@ -247,93 +302,84 @@ export default {
 
 
 
-        redefineConsole() {
-            const wv = this.ggbWebview()
-            if (!wv) return
-            if (this._ggbConsoleBound) wv.removeEventListener('console-message', this._ggbConsoleBound)
-            this._ggbConsoleBound = (e) => {
-                const message = e.message
-                if (typeof message === 'string' && message.includes('existing geo:')) {
-                    const partAfterExistingGeo = message.split('existing geo:')[1].trim()
-                    const extractedText = partAfterExistingGeo.split('=')[1].trim()
-                    if (!this.customClipboard.includes(extractedText)) {
-                        this.customClipboard.push(extractedText)
-                        if (this.customClipboard.length > 10) this.customClipboard.shift()
-                    }
-                }
-            }
-            wv.addEventListener('console-message', this._ggbConsoleBound)
-        },
- 
 
         async loadFilelist(){
             let filelist = await ipcRenderer.invoke('getfilesasync', null)
             this.localfiles = filelist;
         },
-        async injectCSS() {
-            const wv = this.ggbWebview()
-            if (!wv) return
-            const escaped = this.kiosk ? this.customCSS.replace(/`/g, '\\`').replace(/\\/g, '\\\\').replace(/\$/g, '\\$') : ''
-            const hideTexts = this.kiosk ? JSON.stringify(this.hideMenuTexts) : '[]'
-            await wv.executeJavaScript(`
-                (function() {
-                    // 1) Custom CSS (nur im Prüfungsmodus)
-                    var existing = document.getElementById('__ggb_custom_css__')
-                    if (existing) existing.remove()
-                    var s = document.createElement('style')
-                    s.id = '__ggb_custom_css__'
-                    s.textContent = \`${escaped}\`
-                    document.head.appendChild(s)
+        injectCSS() {
+            const cssText = this.kiosk ? this.customCSS : ''
+            const hideTexts = this.kiosk ? this.hideMenuTexts : []
 
-                    // 2) Menüeinträge per Text ausblenden (nur im Prüfungsmodus)
-                    var hideTexts = ${hideTexts}
-                    function hideMenuItems(menu) {
-                        menu.querySelectorAll('li.gwt-MenuItem').forEach(function(li) {
-                            var txt = li.textContent.trim()
-                            if (hideTexts.indexOf(txt) !== -1) {
-                                li.style.setProperty('display', 'none', 'important')
-                            }
-                        })
-                    }
-                    if (window.__ggbMenuObserver__) {
-                        window.__ggbMenuObserver__.disconnect()
-                        window.__ggbMenuObserver__ = null
-                    }
-                    if (hideTexts.length > 0) {
-                        window.__ggbMenuObserver__ = new MutationObserver(function(mutations) {
-                            mutations.forEach(function(m) {
-                                m.addedNodes.forEach(function(node) {
-                                    if (node.nodeType !== 1) return
-                                    var menus = node.classList && node.classList.contains('gwt-MenuBar-vertical')
-                                        ? [node]
-                                        : Array.from(node.querySelectorAll('.gwt-MenuBar-vertical'))
-                                    menus.forEach(hideMenuItems)
-                                })
-                            })
-                        })
-                        window.__ggbMenuObserver__.observe(document.body, { childList: true, subtree: true })
-                        document.querySelectorAll('.gwt-MenuBar-vertical').forEach(hideMenuItems)
-                    }
-                })()
-            `)
-            wv.style.visibility = 'visible'
+            let style = document.getElementById('__ggb_custom_css__')
+            if (style) style.remove()
+            if (this.kiosk) {
+                style = document.createElement('style')
+                style.id = '__ggb_custom_css__'
+                style.textContent = cssText
+                document.head.appendChild(style)
+            }
+
+            if (window.__ggbMenuObserver__) { window.__ggbMenuObserver__.disconnect(); window.__ggbMenuObserver__ = null }
+            if (hideTexts.length > 0) {
+                const hide = (menu) => menu.querySelectorAll('li.gwt-MenuItem').forEach(li => {
+                    if (hideTexts.includes(li.textContent.trim())) li.style.setProperty('display', 'none', 'important')
+                })
+                window.__ggbMenuObserver__ = new MutationObserver(() => {
+                    document.querySelectorAll('.gwt-MenuBar-vertical').forEach(hide)
+                })
+                window.__ggbMenuObserver__.observe(document.body, { childList: true, subtree: true })
+                document.querySelectorAll('.gwt-MenuBar-vertical').forEach(hide)
+            }
         },
 
         setsource(source) {
-            const wv = this.ggbWebview()
-            if (!wv) return
-            wv.style.visibility = 'hidden'
-            if (source === 'suite') wv.src = './geogebra/suite.html'
-            if (source === 'classic') wv.src = './geogebra/classic.html'
-            this.redefineConsole()
+            this.initGeoGebra(source)
         },
+
         showClipboard() {
-            this.isClipboardVisible = this.isClipboardVisible ? false: true;
+            this.isClipboardVisible = !this.isClipboardVisible
         },
-        async insertFromClipboar(value) {
-            const wv = this.ggbWebview()
-            if (!wv) return
-            await wv.executeJavaScript(`window.ggbApplet && window.ggbApplet.evalCommand(${JSON.stringify(value)})`)
+
+        ggbClipboardValueFromObject(api, label) {
+            const t = String(api.getObjectType(label) ?? '').toLowerCase()
+            if (['numeric', 'numericfree', 'angle'].includes(t)) {
+                const v = api.getValue(label)
+                if (Number.isFinite(v)) {
+                    const r = Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v) : v
+                    return String(r)
+                }
+            }
+            const raw = String(api.getValueString(label) ?? '').trim()
+            const eq = raw.indexOf('=')
+            if (eq >= 0) return raw.slice(eq + 1).trim() || raw
+            return raw
+        },
+
+        ggbClipboardInsertAtCaret(api, insertText) {
+            if (typeof api.getEditorState !== 'function' || typeof api.setEditorState !== 'function') return
+            const text = String(insertText ?? '')
+            if (!text) return
+            let state = api.getEditorState()
+            if (typeof state === 'string') {
+                try { state = JSON.parse(state) } catch { state = {} }
+            }
+            if (!state || typeof state !== 'object') state = {}
+            const content = String(state.content ?? '')
+            let caret = typeof state.caret === 'number' ? state.caret : content.length
+            caret = Math.max(0, Math.min(caret, content.length))
+            const newContent = content.slice(0, caret) + text + content.slice(caret)
+            const newCaret = caret + text.length
+            api.setEditorState({ ...state, content: newContent, caret: newCaret })
+        },
+
+        insertFromClipboar(value) {
+            const api = window.ggbApplet
+            if (!api) return
+            this.ggbClipboardInsertAtCaret(api, String(value ?? ''))
+            this.$nextTick(() => {
+                document.querySelector('#content iframe')?.contentWindow?.focus()
+            })
         },
 
         clearAll() {
@@ -341,22 +387,15 @@ export default {
                 title: '',
                 text: 'Alle Berechnungen löschen?',
                 showCancelButton: true,
-                inputAttributes: {
-                    maxlength: 20,
-                },
                 confirmButtonText: 'Ok',
                 cancelButtonText: 'Abbrechen',
-            }).then(async (result) => {
-                if (!result.isConfirmed) return
-                const wv = this.ggbWebview()
-                if (wv) await wv.executeJavaScript('window.ggbApplet && window.ggbApplet.reset()')
+            }).then((result) => {
+                if (result.isConfirmed) window.ggbApplet?.reset()
             })
         },
 
-         /** Saves Content as GGB */
         async saveContent(manual) {
-            const wv = this.ggbWebview()
-            if (!wv) return
+            if (!window.ggbApplet) return
             let filename = `${this.clientname}.ggb`
             if (manual) {
                 const dlg = await this.$swal({
@@ -364,14 +403,11 @@ export default {
                     input: 'text',
                     inputPlaceholder: 'Type here...',
                     showCancelButton: true,
-                    inputAttributes: {
-                        maxlength: 20,
-                    },
+                    inputAttributes: { maxlength: 20 },
                     confirmButtonText: 'Ok',
                     cancelButtonText: 'Abbrechen',
                     inputValidator: (value) => {
-                        const regex = /^[A-Za-z0-9]+$/
-                        if (!value.match(regex)) return 'Bitte geben Sie nur Buchstaben oder Zahlen ein.'
+                        if (!value.match(/^[A-Za-z0-9]+$/)) return 'Bitte geben Sie nur Buchstaben oder Zahlen ein.'
                     },
                 })
                 if (!dlg.isConfirmed) return
@@ -379,10 +415,10 @@ export default {
             }
             let base64GgbFile
             try {
-                base64GgbFile = await wv.executeJavaScript(`new Promise((resolve, reject) => {
-                    if (!window.ggbApplet) reject(new Error('no ggbApplet'))
-                    else window.ggbApplet.getBase64(resolve)
-                })`)
+                base64GgbFile = await new Promise((resolve, reject) => {
+                    window.ggbApplet.getBase64(resolve)
+                    setTimeout(() => reject(new Error('timeout')), 10000)
+                })
             } catch (e) {
                 console.error('geogebra @ saveContent:', e)
                 return
@@ -390,51 +426,32 @@ export default {
             const response = await ipcRenderer.invoke('saveGGB', { filename, content: base64GgbFile })
             if (response.status === 'success' && manual) {
                 this.loadFilelist()
-                this.$swal.fire({
-                    title: 'Gespeichert',
-                    text: filename,
-                    icon: 'info',
-                })
+                this.$swal.fire({ title: 'Gespeichert', text: filename, icon: 'info' })
             }
         },
 
-
-
-        // get file from local workdirectory and replace editor content with it
-        async loadGGB(file){
+        async loadGGB(file) {
             this.$swal.fire({
                 title: "Ersetzen",
-                html:  `${"Wollen Sie den Inhalt der Datei"} <b>${file}</b> ${"ersetzen?"}`,
+                html: `Wollen Sie den Inhalt der Datei <b>${file}</b> ersetzen?`,
                 icon: "question",
                 showCancelButton: true,
                 cancelButtonText: "Abbrechen",
                 reverseButtons: true
+            }).then(async (result) => {
+                if (!result.isConfirmed) return
+                const res = await ipcRenderer.invoke('loadGGB', file)
+                if (res.status === 'success') window.ggbApplet?.setBase64(res.content)
+                else console.error('Error loading file')
             })
-            .then(async (result) => {
-                if (result.isConfirmed) {
-
-                    const result = await ipcRenderer.invoke('loadGGB', file);
-                    if (result.status === 'success') {
-                        const base64GgbFile = result.content
-                        const wv = this.ggbWebview()
-                        if (wv) {
-                            await wv.executeJavaScript(`window.ggbApplet && window.ggbApplet.setBase64(${JSON.stringify(base64GgbFile)})`)
-                        }
-                    } else {
-                        console.error('Error loading file');
-                    }
-                } 
-            }); 
         },
        
     },
     beforeUnmount() {
         clearInterval(this.loadfilelistinterval)
-        const wv = document.getElementById('geogebraframe')
-        if (wv) {
-            if (this._ggbConsoleBound) wv.removeEventListener('console-message', this._ggbConsoleBound)
-            if (this._cssInjectBound) wv.removeEventListener('did-finish-load', this._cssInjectBound)
-            if (this._domReadyBound) wv.removeEventListener('dom-ready', this._domReadyBound)
+        if (this._resizeHandler) {
+            window.removeEventListener('resize', this._resizeHandler)
+            this._resizeHandler = null
         }
     },
 }
@@ -442,6 +459,11 @@ export default {
 </script>
 
 <style scoped>
+
+
+
+
+
 
 .clipboard-slide-enter-active,
 .clipboard-slide-leave-active {

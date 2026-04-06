@@ -47,10 +47,12 @@ if (!fs.existsSync(config.tempdirectory)){ fs.mkdirSync(config.tempdirectory); }
 
 
 app.commandLine.appendSwitch('lang', 'de')
-//app.commandLine.appendSwitch('no-sandbox'); // Fügt den no-sandbox Flag hinzu
-//app.commandLine.appendSwitch('disable-dev-shm-usage');
-
-//app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('enable-features', 'SharedArrayBuffer')
+app.commandLine.appendSwitch('disable-web-security')
+app.commandLine.appendSwitch('enable-webgl')
+app.commandLine.appendSwitch('ignore-gpu-blacklist')
+app.commandLine.appendSwitch('enable-gpu-rasterization')
+app.commandLine.appendSwitch('disable-features', 'WaylandColorManagement')
 
 
 fs.rmSync(config.tempdirectory, { recursive: true, force: true })
@@ -75,12 +77,11 @@ log.info('main: Logger initialized...');
  // APP handling (Backend) START
 ////////////////////////////////
 
-// Disable GPU Acceleration for Windows 7
-if (release().startsWith('6.1')) app.disableHardwareAcceleration()
+// Disable GPU Acceleration for Windows 7 (NT kernel 6.1)
+if (process.platform === 'win32' && release().startsWith('6.1')) app.disableHardwareAcceleration()
 
 // Set application name for Windows 10+ notifications
 if (process.platform === 'win32') {  app.setAppUserModelId(app.getName())}
-if (process.platform ==='darwin') {  app.dock.hide() }  // safer fullscreen
 
 
 

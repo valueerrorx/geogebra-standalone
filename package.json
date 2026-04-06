@@ -16,7 +16,8 @@
         "start": "node scripts/start.mjs",
         "build": "node scripts/build.mjs && electron-builder -l",
         "build:mac": "node scripts/build.mjs && electron-builder -m",
-        "build:win": "node scripts/build.mjs && electron-builder -w"
+        "build:win": "node scripts/build.mjs && electron-builder -w",
+        "download": "node scripts/download.mjs"
     },
     "build": {
         "productName": "GeoGebra-Standalone",
