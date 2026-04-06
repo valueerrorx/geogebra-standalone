@@ -257,7 +257,7 @@ export default {
                 }
             }
             const applet = new GGBApplet(params, true)
-            applet.setHTML5Codebase('/geogebra/GeoGebra/HTML5/5.0/web3d/')
+            applet.setHTML5Codebase(`${import.meta.env.BASE_URL}geogebra/GeoGebra/HTML5/5.0/web3d/`)
             applet.inject('content')
         },
 
