@@ -65,7 +65,9 @@
             :key="index"
             type="button"
             class="customClipboard__item"
-            @click="insertFromClipboar(item)"
+            @mousedown.prevent="insertFromClipboar(item)"
+            @keydown.enter.prevent="insertFromClipboar(item)"
+            @keydown.space.prevent="insertFromClipboar(item)"
           >
             <img
               src="/src/assets/img/svg/edit-paste-style.svg"
@@ -259,8 +261,6 @@ export default {
             applet.inject('content')
         },
 
-
-
         // kiosk mode mit ipc invoke aktuvieren für electron
         activateKiosk(){
             if (this.kiosk){
@@ -356,30 +356,32 @@ export default {
             return raw
         },
 
-        ggbClipboardInsertAtCaret(api, insertText) {
+        ggbClipboardAppendToEditor(api, insertText) {
             if (typeof api.getEditorState !== 'function' || typeof api.setEditorState !== 'function') return
             const text = String(insertText ?? '')
             if (!text) return
             let state = api.getEditorState()
             if (typeof state === 'string') {
-                try { state = JSON.parse(state) } catch { state = {} }
+                try {
+                    state = JSON.parse(state)
+                } catch {
+                    state = {}
+                }
             }
             if (!state || typeof state !== 'object') state = {}
             const content = String(state.content ?? '')
-            let caret = typeof state.caret === 'number' ? state.caret : content.length
-            caret = Math.max(0, Math.min(caret, content.length))
-            const newContent = content.slice(0, caret) + text + content.slice(caret)
-            const newCaret = caret + text.length
+            let insertStart = typeof state.caret === 'number' ? state.caret : content.length
+            insertStart = Math.max(0, Math.min(insertStart, content.length))
+            const insertEnd = insertStart
+            const newContent = content.slice(0, insertStart) + text + content.slice(insertEnd)
+            const newCaret = insertStart + text.length
             api.setEditorState({ ...state, content: newContent, caret: newCaret })
         },
 
         insertFromClipboar(value) {
-            const api = window.ggbApplet
-            if (!api) return
-            this.ggbClipboardInsertAtCaret(api, String(value ?? ''))
-            this.$nextTick(() => {
-                document.querySelector('#content iframe')?.contentWindow?.focus()
-            })
+            const text = String(value ?? '')
+            if (!text || !window.ggbApplet) return
+            this.ggbClipboardAppendToEditor(window.ggbApplet, text)
         },
 
         clearAll() {
