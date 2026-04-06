@@ -12,6 +12,9 @@ const DOWNLOAD_URL = 'https://download.geogebra.org/package/geogebra-math-apps-b
 const ZIP_PATH = path.join(ROOT, 'geogebra-bundle.zip')
 const EXTRACT_DIR = path.join(ROOT, 'packages', 'renderer', 'public', 'geogebra')
 
+const httpsAgent = new https.Agent({ keepAlive: false })
+const httpAgent = new http.Agent({ keepAlive: false })
+
 function resolveRedirect(base, location) {
     if (location.startsWith('http://') || location.startsWith('https://')) return location
     const u = new URL(base)
@@ -21,7 +24,8 @@ function resolveRedirect(base, location) {
 function get(url) {
     return new Promise((resolve, reject) => {
         const lib = url.startsWith('https') ? https : http
-        lib.get(url, (res) => {
+        const agent = url.startsWith('https') ? httpsAgent : httpAgent
+        lib.get(url, { agent }, (res) => {
             if (res.statusCode === 301 || res.statusCode === 302) {
                 get(resolveRedirect(url, res.headers.location)).then(resolve, reject)
             } else if (res.statusCode !== 200) {

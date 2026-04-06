@@ -14,6 +14,12 @@ just the original geogebra packaged as linux appimage and debian package
 
 ```npm i```
 
+## download GeoGebra assets
+
+**Run this once** It fetches the GeoGebra HTML5 bundle into `packages/renderer/public/geogebra/`
+
+```npm run download```
+
 ## run geogebra
 
 ```npm run dev```
@@ -22,6 +28,10 @@ just the original geogebra packaged as linux appimage and debian package
 
 ```npm run build```
 
+## typical order
 
+1. `npm i`
+2. `npm run download`
+3. `npm run dev` — or — `npm run build`
 
 
