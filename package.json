@@ -71,7 +71,7 @@
         "@popperjs/core": "^2.11.8",
         "bootstrap": "^5.3.8",
         "electron-log": "^5.4.3",
-        "esbuild": "^0.28.0",
+        "esbuild": "^0.27.0",
         "sass": "^1.99.0",
         "vue-router": "^5.0.4",
         "vue-sweetalert2": "^5.0.11"
